@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿// QOL-Ex
+using HarmonyLib;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -59,8 +60,8 @@ public static class ChatBubbleCapFix
         private void LateUpdate()
         {
             if (!_initialized) return;
-            if (_cam == null) _cam = Camera.main;
-            if (_cam == null || _followTransform == null) return;
+            if (!_cam) _cam = Camera.main;
+            if (!_cam || !_followTransform) return;
 
             var currentHalfHeight = _cam.orthographicSize;
             var currentHalfWidth = currentHalfHeight * _cam.aspect;

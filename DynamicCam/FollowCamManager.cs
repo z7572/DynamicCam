@@ -60,10 +60,10 @@ public class FollowCamManager : MonoBehaviour
 
     private IEnumerator EnsureCameraRoutine()
     {
-        while (_cam == null)
+        while (!_cam)
         {
             _cam = Camera.main;
-            if (_cam != null)
+            if (_cam)
             {
                 initialPos = transform.position;
             }
@@ -111,7 +111,7 @@ public class FollowCamManager : MonoBehaviour
             }
             else
             {
-                if (LevelCreator.Instance != null && _cam != null)
+                if (LevelCreator.Instance && _cam)
                 {
                     initialPos = transform.position;
                 }
@@ -252,16 +252,16 @@ public class FollowCamManager : MonoBehaviour
 
     private bool IsPlayerDead(Controller c)
     {
-        if (c == null) return true;
+        if (!c) return true;
         var info = c.GetComponent<CharacterInformation>();
-        return info != null && info.isDead;
+        return info && info.isDead;
     }
 
     private void LateUpdate()
     {
-        if (!ShouldZoomIn || targetController == null || _cam == null) return;
+        if (!ShouldZoomIn || !targetController || !_cam) return;
 
-        if (targetController == null)
+        if (!targetController)
         {
             SetFollowDesired(false);
             return;
@@ -288,7 +288,7 @@ public class FollowCamManager : MonoBehaviour
 
     private void RestorePosition()
     {
-        if (this != null && gameObject != null)
+        if (this && gameObject)
         {
             transform.position = initialPos;
         }

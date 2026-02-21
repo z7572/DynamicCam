@@ -8,6 +8,26 @@ public static class CameraFollowFix
 {
     public static float RealMapSize { get; private set; } = 10f;
 
+    public static bool DefaultFollowSmallMap
+    {
+        get => ConfigHandler.GetEntry<bool>("DefaultFollowSmallMap");
+        set
+        {
+            if (DefaultFollowSmallMap == value) return;
+            ConfigHandler.ModifyEntry("DefaultFollowSmallMap", value.ToString());
+        }
+    }
+
+    public static float DefaultOrthographicSize
+    {
+        get => ConfigHandler.GetEntry<float>("DefaultOrthographicSize");
+        set
+        {
+            if (Mathf.Approximately(DefaultOrthographicSize, value)) return;
+            ConfigHandler.ModifyEntry("DefaultOrthographicSize", value.ToString());
+        }
+    }
+
     [HarmonyPatch(typeof(HealthHandler))]
     public static class HealthHandlerPatch
     {
@@ -17,7 +37,7 @@ public static class CameraFollowFix
         public static void DiePostfix(HealthHandler __instance)
         {
             if (LevelCreator.Instance != null) return;
-            if (RealMapSize <= 15f) return;
+            if (RealMapSize <= 15f && !DefaultFollowSmallMap) return;
 
             var controller = __instance.GetComponent<Controller>();
             FollowCamManager.Instance.OnPlayerDied(controller);
@@ -36,7 +56,7 @@ public static class CameraFollowFix
 
             RealMapSize = newSize;
 
-            Debug.Log($"[QOL] Map Size Loaded: {RealMapSize}. Resetting to Full View.");
+            Debug.Log($"[DynamicCam] Map Size Loaded: {RealMapSize}. Resetting to Full View.");
 
             if (FollowCamManager.Instance != null)
             {
@@ -50,9 +70,9 @@ public static class CameraFollowFix
         {
             if (LevelCreator.Instance != null) return;
 
-            if (MatchmakingHandler.IsNetworkMatch && RealMapSize > 15f)
+            if (MatchmakingHandler.IsNetworkMatch && (RealMapSize > 15f || DefaultFollowSmallMap))
             {
-                Debug.Log("[QOL] Online Match & Big Map. Starting 1s Delay...");
+                //Debug.Log("[QOL] Online Match & Big Map. Starting 1s Delay...");
                 FollowCamManager.Instance.SetFollowDelayed(true, 1.0f);
             }
         }
@@ -65,9 +85,9 @@ public static class CameraFollowFix
 
             if (comingIn)
             {
-                if (!MatchmakingHandler.IsNetworkMatch && RealMapSize > 15f)
+                if (!MatchmakingHandler.IsNetworkMatch && (RealMapSize > 15f || DefaultFollowSmallMap))
                 {
-                    Debug.Log("[QOL] Local Match & Big Map (Map Moving In). Starting 1s Delay...");
+                    //Debug.Log("[QOL] Local Match & Big Map (Map Moving In). Starting 1s Delay...");
                     FollowCamManager.Instance.SetFollowDelayed(true, 1.0f);
                 }
             }
@@ -87,7 +107,7 @@ public static class CameraFollowFix
         public static void RevivePlayerPostfix(Controller playerToRevive)
         {
             if (LevelCreator.Instance != null) return;
-            if (RealMapSize <= 15f) return;
+            if (RealMapSize <= 15f && !DefaultFollowSmallMap) return;
 
             if (playerToRevive == Helper.controller)
             {
@@ -118,16 +138,14 @@ public static class CameraFollowFix
         [HarmonyPostfix]
         public static void OnPlayTestStartedPostfix()
         {
-            Debug.Log("[QOL] PlayTest Started.");
-
             if (MapSizeHandler.Instance != null)
             {
                 var currentSize = MapSizeHandler.Instance.mapSize;
                 RealMapSize = currentSize;
 
-                if (currentSize > 15f)
+                if (currentSize > 15f || DefaultFollowSmallMap)
                 {
-                    Debug.Log($"[QOL] Editor Big Map ({currentSize}). Enabling Follow.");
+                    Debug.Log($"[DynamicCam] Editor Big Map ({currentSize}). Enabling Follow.");
                     FollowCamManager.Instance.SetFollowDesired(true);
                 }
             }
@@ -137,7 +155,6 @@ public static class CameraFollowFix
         [HarmonyPostfix]
         public static void OnPlayTestEndedPostfix()
         {
-            Debug.Log("[QOL] PlayTest Ended. Disabling Follow.");
             FollowCamManager.Instance.SetFollowDesired(false);
         }
     }
@@ -164,11 +181,11 @@ public static class CameraFollowFix
 
                     if (WorkshopStateHandler.IsPlayTestingMode)
                     {
-                        var shouldZoom = realEditorSize > 15f && FollowCamManager.Instance.ShouldZoomIn;
+                        var shouldZoom = (realEditorSize > 15f || DefaultFollowSmallMap) && FollowCamManager.Instance.ShouldZoomIn;
 
                         if (shouldZoom)
                         {
-                            scaleMultiplier = 1.0f;
+                            scaleMultiplier = DefaultOrthographicSize / 10f;
                         }
                         else
                         {
@@ -185,11 +202,11 @@ public static class CameraFollowFix
             {
                 var targetSize = ___mapSize;
 
-                var shouldZoom = ___mapSize > 15f && FollowCamManager.Instance.ShouldZoomIn;
+                var shouldZoom = (___mapSize > 15f || DefaultFollowSmallMap) && FollowCamManager.Instance.ShouldZoomIn;
 
                 if (shouldZoom)
                 {
-                    targetSize = 10f;
+                    targetSize = DefaultOrthographicSize; // 10f;
                 }
 
                 ___mapSizeVelocity += (targetSize - ___currentMapSize) * ___spring;

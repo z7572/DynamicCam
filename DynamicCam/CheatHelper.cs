@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿// QOL-Ex
+using HarmonyLib;
 using Steamworks;
 using System;
 using System.Collections;
@@ -19,7 +20,7 @@ public static class CheatHelper
         if (Time.time - _lastRigsCacheTime > _rigsCleanUpInterval)
         {
             _lastRigsCacheTime = Time.time;
-            var deadKeys = _cachedPlayerRigs.Keys.Where(c => c == null).ToList();
+            var deadKeys = _cachedPlayerRigs.Keys.Where(c => !c).ToList();
             foreach (var deadKey in deadKeys) _cachedPlayerRigs.Remove(deadKey);
         }
         if (!_cachedPlayerRigs.TryGetValue(controller, out var rigs))

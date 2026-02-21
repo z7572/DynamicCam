@@ -11,6 +11,7 @@ public static class ConfigHandler
 {
     private static readonly Dictionary<string, ConfigEntryBase> EntriesDict = new(StringComparer.InvariantCultureIgnoreCase);
 
+    private const string FollowCamSect = "FollowCam";
     private const string KeySect = "Keys";
 
     public static void InitConfig(ConfigFile config)
@@ -22,6 +23,12 @@ public static class ConfigHandler
         {
             FollowCamManager.Instance.Keybind = dynamicCamKeybindEntry.Value.MainKey;
         };
+
+        var defaultFollowSmallMapEntry = config.Bind(FollowCamSect, "DefaultFollowSmallMap", false, "小地图是否也默认跟随视角");
+        EntriesDict[defaultFollowSmallMapEntry.Definition.Key] = defaultFollowSmallMapEntry;
+
+        var defaultOrthographicSizeEntry = config.Bind(FollowCamSect, "DefaultOrthographicSize", 10f, "默认视角大小");
+        EntriesDict[defaultOrthographicSizeEntry.Definition.Key] = defaultOrthographicSizeEntry;
     }
 
     public static T GetEntry<T>(string entryKey, bool defaultValue = false)

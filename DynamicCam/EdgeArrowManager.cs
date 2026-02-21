@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿// QOL-Ex
+using System.Linq;
 using UnityEngine;
 
 namespace DynamicCam;
