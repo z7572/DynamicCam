@@ -5,7 +5,7 @@
     <AssemblyName>DynamicCam</AssemblyName>
     <RootNamespace>DynamicCam</RootNamespace>
     <Authors>z7572</Authors>
-    <Version>1.1</Version>
+    <Version>1.2</Version>
     <Product>DynamicCam</Product>
     <Description>A BepInEx mod for Stick Fight: The Game</Description>
     <AssemblyVersion></AssemblyVersion>
