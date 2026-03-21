@@ -150,7 +150,8 @@ public class FollowCamManager : MonoBehaviour
     {
         if (Input.GetKeyDown(Keybind))
         {
-            if (IsPlayerDead(Helper.controller))
+            var canSpec = IsPlayerDead(Helper.controller) || ConfigHandler.GetEntry<bool>("EnableSpecWhenAlive");
+            if (canSpec)
             {
                 CycleSpectateTarget();
             }

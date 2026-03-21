@@ -29,6 +29,9 @@ public static class ConfigHandler
 
         var defaultOrthographicSizeEntry = config.Bind(FollowCamSect, "DefaultOrthographicSize", 10f, "默认视角大小");
         EntriesDict[defaultOrthographicSizeEntry.Definition.Key] = defaultOrthographicSizeEntry;
+
+        var enableSpecWhenAliveEntry = config.Bind(FollowCamSect, "EnableSpecWhenAlive", false, "是否在玩家存活时启用视角切换");
+        EntriesDict[enableSpecWhenAliveEntry.Definition.Key] = enableSpecWhenAliveEntry;
     }
 
     public static T GetEntry<T>(string entryKey, bool defaultValue = false)
