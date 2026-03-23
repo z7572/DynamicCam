@@ -64,6 +64,7 @@ public class FollowCamManager : MonoBehaviour
         _instance = this;
         initialPos = transform.position;
         Keybind = ConfigHandler.GetEntry<KeyboardShortcut>("DynamicCamKeybind").MainKey;
+        ResetKeybind = ConfigHandler.GetEntry<KeyboardShortcut>("ResetViewportKeybind").MainKey;
         StartCoroutine(EnsureCameraRoutine());
     }
 
@@ -216,7 +217,7 @@ public class FollowCamManager : MonoBehaviour
             {
                 _hasUsedDynamicActions = true;
                 _customOffset = Vector3.zero;
-                ConfigHandler.ResetEntry("DefaultOrthographicSize");
+                Helper.DefaultOrthographicSize = 10f;
             }
         }
 
