@@ -17,7 +17,7 @@ public static class ConfigHandler
     public static void InitConfig(ConfigFile config)
     {
         var dynamicCamKeybindEntry = config.Bind(KeySect, "DynamicCamKeybind", new KeyboardShortcut(KeyCode.F5),
-            "切换相机跟随快捷键，按住并拖动鼠标中键以拖动视角，按住并滚动以放大缩小");
+            "切换相机跟随快捷键，按住并拖动鼠标中键以拖动视角，按住并滚动以缩放视角");
         EntriesDict[dynamicCamKeybindEntry.Definition.Key] = dynamicCamKeybindEntry;
         dynamicCamKeybindEntry.SettingChanged += (_, _) =>
         {
