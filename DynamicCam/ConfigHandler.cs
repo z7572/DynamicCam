@@ -17,11 +17,19 @@ public static class ConfigHandler
     public static void InitConfig(ConfigFile config)
     {
         var dynamicCamKeybindEntry = config.Bind(KeySect, "DynamicCamKeybind", new KeyboardShortcut(KeyCode.F5),
-            "切换相机跟随快捷键");
+            "切换相机跟随快捷键，按住并拖动鼠标中键以拖动视角，按住并滚动以放大缩小");
         EntriesDict[dynamicCamKeybindEntry.Definition.Key] = dynamicCamKeybindEntry;
         dynamicCamKeybindEntry.SettingChanged += (_, _) =>
         {
             FollowCamManager.Instance.Keybind = dynamicCamKeybindEntry.Value.MainKey;
+        };
+
+        var resetViewportKeybindEntry = config.Bind(KeySect, "ResetViewportKeybind", new KeyboardShortcut(KeyCode.F1),
+            "同时按住切换相机跟随快捷键和此按键以重置视角");
+        EntriesDict[resetViewportKeybindEntry.Definition.Key] = resetViewportKeybindEntry;
+        resetViewportKeybindEntry.SettingChanged += (_, _) =>
+        {
+            FollowCamManager.Instance.ResetKeybind = resetViewportKeybindEntry.Value.MainKey;
         };
 
         var defaultFollowSmallMapEntry = config.Bind(FollowCamSect, "DefaultFollowSmallMap", false, "小地图是否也默认跟随视角");

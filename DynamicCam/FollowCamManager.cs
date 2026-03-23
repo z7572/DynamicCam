@@ -3,8 +3,8 @@ using LevelEditor;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using DynamicCam.Patches;
 using BepInEx.Configuration;
+using DynamicCam.Patches;
 
 namespace DynamicCam;
 
@@ -44,6 +44,15 @@ public class FollowCamManager : MonoBehaviour
     public bool ShouldZoomIn { get; private set; } = false;
 
     public KeyCode Keybind;
+    public KeyCode ResetKeybind;
+
+    // Dynamic viewport
+    private Vector3 _customOffset = Vector3.zero;
+    private float _keyDownTime = 0f;
+    private bool _hasUsedDynamicActions = false;
+    private Vector3 _lastMousePos;
+    private bool _isDragging = false;
+    private const float DragThreshold = 5f;
 
     private void Awake()
     {
@@ -150,22 +159,94 @@ public class FollowCamManager : MonoBehaviour
     {
         if (Input.GetKeyDown(Keybind))
         {
-            var canSpec = IsPlayerDead(Helper.controller) || ConfigHandler.GetEntry<bool>("EnableSpecWhenAlive");
-            if (canSpec)
+            _keyDownTime = Time.time;
+            _hasUsedDynamicActions = false;
+            _isDragging = false;
+        }
+
+        if (Input.GetKey(Keybind))
+        {
+            var scroll = Input.GetAxis("Mouse ScrollWheel");
+            if (Mathf.Abs(scroll) > 0.001f)
             {
-                CycleSpectateTarget();
+                _hasUsedDynamicActions = true;
+                var currentSize = Helper.DefaultOrthographicSize;
+                var newSize = currentSize - scroll * 10f;
+                newSize = Mathf.Max(1f, newSize);
+                Helper.DefaultOrthographicSize = newSize;
+            }
+
+            if (Input.GetMouseButtonDown(2))
+            {
+                _lastMousePos = Input.mousePosition;
+                _isDragging = false;
+            }
+
+            if (Input.GetMouseButton(2))
+            {
+                if (!_isDragging && Vector3.Distance(Input.mousePosition, _lastMousePos) > DragThreshold)
+                {
+                    _isDragging = true;
+                    _lastMousePos = Input.mousePosition;
+                }
+
+                if (_isDragging && _cam != null)
+                {
+                    _hasUsedDynamicActions = true;
+
+                    var worldCurrent = _cam.ScreenToWorldPoint(Input.mousePosition);
+                    var worldLast = _cam.ScreenToWorldPoint(_lastMousePos);
+
+                    var difference = worldLast - worldCurrent;
+
+                    _customOffset.x = 0f;
+                    _customOffset.y += difference.y;
+                    _customOffset.z += difference.z;
+
+                    _lastMousePos = Input.mousePosition;
+                }
+            }
+
+            if (Input.GetMouseButtonUp(2))
+            {
+                _isDragging = false;
+            }
+
+            if (Input.GetKeyDown(ResetKeybind))
+            {
+                _hasUsedDynamicActions = true;
+                _customOffset = Vector3.zero;
+                ConfigHandler.ResetEntry("DefaultOrthographicSize");
+            }
+        }
+
+        if (Input.GetKeyUp(Keybind))
+        {
+            _isDragging = false;
+            if (!_hasUsedDynamicActions && (Time.time - _keyDownTime < 0.3f))
+            {
+                ToggleFollow();
+            }
+        }
+    }
+
+    private void ToggleFollow()
+    {
+        var canSpec = IsPlayerDead(Helper.controller) || ConfigHandler.GetEntry<bool>("EnableSpecWhenAlive");
+        if (canSpec)
+        {
+            CycleSpectateTarget();
+        }
+        else
+        {
+            if (ShouldZoomIn)
+            {
+                SetFollowDelayed(false, 0f);
             }
             else
             {
-                if (ShouldZoomIn)
-                {
-                    SetFollowDelayed(false, 0f);
-                }
-                else
-                {
-                    RegisterController(Helper.controller);
-                    SetFollowDelayed(true, 0f);
-                }
+                RegisterController(Helper.controller);
+                SetFollowDelayed(true, 0f);
             }
         }
     }
@@ -269,9 +350,10 @@ public class FollowCamManager : MonoBehaviour
         }
 
         var playerPos = CheatHelper.GetPlayerPosition(targetController);
-        var targetPos = new Vector3(initialPos.x, playerPos.y, playerPos.z);
-        var currentPos = transform.position;
+        var targetPos = new Vector3(initialPos.x, playerPos.y, playerPos.z) + _customOffset;
+        targetPos.x = initialPos.x;
 
+        var currentPos = transform.position;
         var dist = Vector3.Distance(currentPos, targetPos);
 
         if (dist > 50f)

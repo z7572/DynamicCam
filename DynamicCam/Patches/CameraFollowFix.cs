@@ -1,32 +1,13 @@
 ﻿using HarmonyLib;
 using LevelEditor;
 using UnityEngine;
+using static DynamicCam.Helper;
 
 namespace DynamicCam.Patches;
 
 public static class CameraFollowFix
 {
     public static float RealMapSize { get; private set; } = 10f;
-
-    public static bool DefaultFollowSmallMap
-    {
-        get => ConfigHandler.GetEntry<bool>("DefaultFollowSmallMap");
-        set
-        {
-            if (DefaultFollowSmallMap == value) return;
-            ConfigHandler.ModifyEntry("DefaultFollowSmallMap", value.ToString());
-        }
-    }
-
-    public static float DefaultOrthographicSize
-    {
-        get => ConfigHandler.GetEntry<float>("DefaultOrthographicSize");
-        set
-        {
-            if (Mathf.Approximately(DefaultOrthographicSize, value)) return;
-            ConfigHandler.ModifyEntry("DefaultOrthographicSize", value.ToString());
-        }
-    }
 
     [HarmonyPatch(typeof(HealthHandler))]
     public static class HealthHandlerPatch
@@ -109,7 +90,7 @@ public static class CameraFollowFix
             if (LevelCreator.Instance != null) return;
             if (RealMapSize <= 15f && !DefaultFollowSmallMap) return;
 
-            if (playerToRevive == Helper.controller)
+            if (playerToRevive == controller)
             {
                 FollowCamManager.Instance.OnLocalPlayerRevived(playerToRevive);
             }
