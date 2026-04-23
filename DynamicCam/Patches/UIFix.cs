@@ -25,8 +25,7 @@ public static class UIFix
         var canvasObj = GameManager.Instance.GameCanvas;
         var camTransform = Camera.main.transform;
 
-        var rigidCam = camTransform.parent;
-        var targetParent = rigidCam != null ? rigidCam : camTransform;
+        var targetParent = camTransform.parent != null ? camTransform.parent : camTransform;
 
         if (canvasObj.transform.parent != targetParent)
         {
@@ -37,10 +36,12 @@ public static class UIFix
         canvasObj.transform.localPosition = new Vector3(10f, 0f, 0f);
         canvasObj.transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
 
-        if (canvasObj.GetComponent<UIStabilizer>() == null)
+        var uiStabilizer = canvasObj.GetComponent<UIStabilizer>();
+        if (uiStabilizer == null)
         {
-            canvasObj.AddComponent<UIStabilizer>();
+            uiStabilizer = canvasObj.AddComponent<UIStabilizer>();
         }
+        uiStabilizer.SiblingToCam = false;
 
         GameManager.Instance.LastAppliedScale = 1f;
     }
@@ -78,15 +79,18 @@ public static class UIFix
         EditorCanvas.transform.localRotation = Quaternion.Euler(0f, 0f, 0f);
         EditorCanvas.transform.localScale = new Vector3(0.0148f, 0.0148f, 0.0148f);
 
-        if (EditorCanvas.GetComponent<UIStabilizer>() == null)
+        var uiStabilizer = EditorCanvas.GetComponent<UIStabilizer>();
+        if (uiStabilizer == null)
         {
-            EditorCanvas.AddComponent<UIStabilizer>();
+            uiStabilizer = EditorCanvas.AddComponent<UIStabilizer>();
         }
+        uiStabilizer.SiblingToCam = false;
     }
 
     public class UIStabilizer : MonoBehaviour
     {
         private Camera _cam;
+        public bool SiblingToCam = false;
 
         private readonly Vector3 _baseScale = new Vector3(0.0148f, 0.0148f, 0.0148f);
         private const float TargetAspect = 16f / 9f;
@@ -104,6 +108,20 @@ public static class UIFix
                 _cam = Camera.main;
                 if (_cam == null) return;
             }
+
+            if (SiblingToCam)
+            {
+                var expectedParent = _cam.transform.parent != null ? _cam.transform.parent : _cam.transform;
+                if (transform.parent != expectedParent)
+                {
+                    transform.SetParent(expectedParent, true);
+
+                    transform.localPosition = new Vector3(10f, 0f, 0f);
+                    transform.localRotation = Quaternion.Euler(0f, 90f, 0f);
+                    Debug.Log($"{transform.name} reparented to {expectedParent.name}.");
+                }
+            }
+
             UpdateScale();
         }
 

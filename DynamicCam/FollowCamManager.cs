@@ -35,19 +35,25 @@ public class FollowCamManager : MonoBehaviour
     }
 
     private Controller targetController;
-    private Vector3 initialPos;
     private Camera _cam;
 
     private Coroutine _delayedRoutine;
 
     //public bool IsActive => _wantsToFollow && targetController != null;
     public bool ShouldZoomIn { get; private set; } = false;
+    public bool IsCustomZooming { get; private set; } = false;
+    public float CurrentOrthographicSize { get; set; } = 10f;
 
     public KeyCode Keybind;
     public KeyCode ResetKeybind;
 
     // Dynamic viewport
+    private Transform _proxyCam;
+    private Vector3 _followOffset = Vector3.zero;  // 动态跟随产生的坐标补偿
     private Vector3 _customOffset = Vector3.zero;
+    private Vector3 _lastAppliedCamOffset = Vector3.zero;
+    private bool _isRestoring = false;
+
     private float _keyDownTime = 0f;
     private bool _hasUsedDynamicActions = false;
     private Vector3 _lastMousePos;
@@ -62,9 +68,9 @@ public class FollowCamManager : MonoBehaviour
             return;
         }
         _instance = this;
-        initialPos = transform.position;
         Keybind = ConfigHandler.GetEntry<KeyboardShortcut>("DynamicCamKeybind").MainKey;
         ResetKeybind = ConfigHandler.GetEntry<KeyboardShortcut>("ResetViewportKeybind").MainKey;
+        CurrentOrthographicSize = Helper.DefaultOrthographicSize;
         StartCoroutine(EnsureCameraRoutine());
     }
 
@@ -73,9 +79,20 @@ public class FollowCamManager : MonoBehaviour
         while (!_cam)
         {
             _cam = Camera.main;
-            if (_cam)
+            if (_cam && LevelCreator.Instance == null)
             {
-                initialPos = transform.position;
+                if (_cam.transform.parent != null && _cam.transform.parent.name != "DynamicCamProxy")
+                {
+                    GameObject proxyObj = new GameObject("DynamicCamProxy");
+                    _proxyCam = proxyObj.transform;
+                    _proxyCam.SetParent(_cam.transform.parent);
+                    _proxyCam.localPosition = Vector3.zero;
+                    _cam.transform.SetParent(_proxyCam);
+                }
+                else if (_cam.transform.parent != null && _cam.transform.parent.name == "DynamicCamProxy")
+                {
+                    _proxyCam = _cam.transform.parent;
+                }
             }
             yield return new WaitForSeconds(0.5f);
         }
@@ -113,19 +130,19 @@ public class FollowCamManager : MonoBehaviour
         if (ShouldZoomIn != state)
         {
             ShouldZoomIn = state;
+            _hasUsedDynamicActions = false;
 
             if (!ShouldZoomIn)
             {
-                RestorePosition();
+                CurrentOrthographicSize = CameraFollowFix.RealMapSize;
                 targetController = null;
             }
             else
             {
-                if (LevelCreator.Instance && _cam)
-                {
-                    initialPos = transform.position;
-                }
+                CurrentOrthographicSize = Helper.DefaultOrthographicSize;
             }
+
+            _isRestoring = true;
         }
     }
 
@@ -170,11 +187,20 @@ public class FollowCamManager : MonoBehaviour
             var scroll = Input.GetAxis("Mouse ScrollWheel");
             if (Mathf.Abs(scroll) > 0.001f)
             {
+                if (!IsCustomZooming)
+                {
+                    IsCustomZooming = true;
+                    // If scrolling for the first time in fixed view (not following player), use the current map's zoom size as the starting point
+                    if (!ShouldZoomIn)
+                    {
+                        CurrentOrthographicSize = CameraFollowFix.RealMapSize;
+                    }
+                }
+
                 _hasUsedDynamicActions = true;
-                var currentSize = Helper.DefaultOrthographicSize;
-                var newSize = currentSize - scroll * 10f;
+                var newSize = CurrentOrthographicSize - scroll * 10f;
                 newSize = Mathf.Max(1f, newSize);
-                Helper.DefaultOrthographicSize = newSize;
+                CurrentOrthographicSize = newSize;
             }
 
             if (Input.GetMouseButtonDown(2))
@@ -194,13 +220,13 @@ public class FollowCamManager : MonoBehaviour
                 if (_isDragging && _cam != null)
                 {
                     _hasUsedDynamicActions = true;
+                    _isRestoring = false; // 拖拽时强制打断任何自动归位
 
-                    var worldCurrent = _cam.ScreenToWorldPoint(Input.mousePosition);
-                    var worldLast = _cam.ScreenToWorldPoint(_lastMousePos);
+                    Vector3 screenDelta = _lastMousePos - Input.mousePosition;
+                    Vector3 originWorld = _cam.ScreenToWorldPoint(new Vector3(Screen.width / 2f, Screen.height / 2f, 10f));
+                    Vector3 movedWorld = _cam.ScreenToWorldPoint(new Vector3(Screen.width / 2f + screenDelta.x, Screen.height / 2f + screenDelta.y, 10f));
 
-                    var difference = worldLast - worldCurrent;
-
-                    _customOffset.x = 0f;
+                    Vector3 difference = movedWorld - originWorld;
                     _customOffset.y += difference.y;
                     _customOffset.z += difference.z;
 
@@ -216,8 +242,10 @@ public class FollowCamManager : MonoBehaviour
             if (Input.GetKeyDown(ResetKeybind))
             {
                 _hasUsedDynamicActions = true;
-                _customOffset = Vector3.zero;
-                Helper.DefaultOrthographicSize = 10f;
+                CurrentOrthographicSize = ShouldZoomIn ? Helper.DefaultOrthographicSize : CameraFollowFix.RealMapSize;
+                IsCustomZooming = false;
+
+                _isRestoring = true;
             }
         }
 
@@ -256,7 +284,6 @@ public class FollowCamManager : MonoBehaviour
     {
         var deadPos = CheatHelper.GetPlayerPosition(referenceController);
         var nearest = GetNearestAlivePlayer(deadPos);
-
         if (nearest != null)
         {
             RegisterController(nearest);
@@ -342,39 +369,88 @@ public class FollowCamManager : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (!ShouldZoomIn || !targetController || !_cam) return;
+        if (!_cam) return;
 
-        if (!targetController)
+        var isEditor = _proxyCam == null;
+
+        if (isEditor && _lastAppliedCamOffset != Vector3.zero)
         {
-            SetFollowDesired(false);
-            return;
+            _cam.transform.position -= _lastAppliedCamOffset;
+            _lastAppliedCamOffset = Vector3.zero;
         }
 
-        var playerPos = CheatHelper.GetPlayerPosition(targetController);
-        var targetPos = new Vector3(initialPos.x, playerPos.y, playerPos.z) + _customOffset;
-        targetPos.x = initialPos.x;
-
-        var currentPos = transform.position;
-        var dist = Vector3.Distance(currentPos, targetPos);
-
-        if (dist > 50f)
+        if (ShouldZoomIn)
         {
-            transform.position = targetPos;
+            if (!targetController)
+            {
+                SetFollowDesired(false);
+                return;
+            }
+
+            // 智能获取原生相机的底层意图坐标：
+            // 编辑器(无Proxy)直接取自身坐标；游戏场景(有Proxy)取Proxy父级坐标+相机局部坐标
+            Vector3 nativeWorld = isEditor
+                ? _cam.transform.position
+                : (_proxyCam.parent != null ? _proxyCam.parent.position : Vector3.zero) + _cam.transform.localPosition;
+
+            Vector3 playerPos = CheatHelper.GetPlayerPosition(targetController);
+            Vector3 targetFollowOffset = new Vector3(0, playerPos.y - nativeWorld.y, playerPos.z - nativeWorld.z);
+
+            var verticalBound = _cam.orthographicSize;
+            var horizontalBound = _cam.orthographicSize * _cam.aspect;
+
+            var diffY = Mathf.Abs(_followOffset.y - targetFollowOffset.y);
+            var diffZ = Mathf.Abs(_followOffset.z - targetFollowOffset.z);
+
+            if (diffY > verticalBound || diffZ > horizontalBound)
+            {
+                _followOffset = targetFollowOffset; // 出屏瞬间吸附
+            }
+            else
+            {
+                var dist = Vector3.Distance(_followOffset, targetFollowOffset);
+                if (dist > 0.01f)
+                {
+                    _followOffset = Vector3.Lerp(_followOffset, targetFollowOffset, Time.deltaTime * 5f);
+                }
+            }
         }
-        else if (dist > 0.01f)
+        else if (_isRestoring)
         {
-            var t = Mathf.Min(Time.deltaTime * 5f, 1f);
-            var newPos = Vector3.Lerp(currentPos, targetPos, t);
-            newPos.x = initialPos.x;
-            transform.position = newPos;
+            // 固定模式下的归位：将跟随补偿缓缓抽离
+            _followOffset = Vector3.Lerp(_followOffset, Vector3.zero, Time.deltaTime * 5f);
         }
-    }
 
-    private void RestorePosition()
-    {
-        if (this && gameObject)
+        // 处理玩家手拖偏移的缓动归位
+        if (_isRestoring)
         {
-            transform.position = initialPos;
+            _customOffset = Vector3.Lerp(_customOffset, Vector3.zero, Time.deltaTime * 5f);
+
+            // 当足够接近零点时，停息归位状态
+            if (_customOffset.magnitude < 0.05f && _followOffset.magnitude < 0.05f)
+            {
+                _customOffset = Vector3.zero;
+                _followOffset = Vector3.zero;
+                _isRestoring = false;
+            }
+        }
+
+        // 将计算好的总偏移应用到对应的目标上
+        Vector3 totalOffset = _followOffset + _customOffset;
+
+        if (isEditor)
+        {
+            // 编辑器场景：直接叠加给相机，并记录下来供下一帧剥离
+            if (totalOffset != Vector3.zero)
+            {
+                _cam.transform.position += totalOffset;
+                _lastAppliedCamOffset = totalOffset;
+            }
+        }
+        else
+        {
+            // 游戏场景：只修改代理节点的局部坐标！与底层彻底隔离！
+            _proxyCam.localPosition = totalOffset;
         }
     }
 

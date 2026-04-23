@@ -153,6 +153,9 @@ public static class CameraFollowFix
         )
         {
             var scaleMultiplier = 1f;
+            var followCam = FollowCamManager.Instance;
+            var shouldZoom = followCam != null && (followCam.ShouldZoomIn || followCam.IsCustomZooming);
+            var targetOrthoSize = followCam != null ? followCam.CurrentOrthographicSize : DefaultOrthographicSize;
 
             if (MapSizeHandler.Instance)
             {
@@ -162,11 +165,9 @@ public static class CameraFollowFix
 
                     if (WorkshopStateHandler.IsPlayTestingMode)
                     {
-                        var shouldZoom = (realEditorSize > 15f || DefaultFollowSmallMap) && FollowCamManager.Instance.ShouldZoomIn;
-
                         if (shouldZoom)
                         {
-                            scaleMultiplier = DefaultOrthographicSize / 10f;
+                            scaleMultiplier = targetOrthoSize / 10f;
                         }
                         else
                         {
@@ -183,11 +184,9 @@ public static class CameraFollowFix
             {
                 var targetSize = ___mapSize;
 
-                var shouldZoom = (___mapSize > 15f || DefaultFollowSmallMap) && FollowCamManager.Instance.ShouldZoomIn;
-
                 if (shouldZoom)
                 {
-                    targetSize = DefaultOrthographicSize; // 10f;
+                    targetSize = targetOrthoSize;
                 }
 
                 ___mapSizeVelocity += (targetSize - ___currentMapSize) * ___spring;
